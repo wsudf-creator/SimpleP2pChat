@@ -1,7 +1,17 @@
 #include "StunClient.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+
 int main(int argc, char* argv[])
 {
+    #ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);   // 控制台输出用 UTF-8
+    SetConsoleCP(CP_UTF8);         // 控制台输入用 UTF-8
+    #endif
+
     boost::asio::io_context io_context;
     udp::resolver resolver(io_context);
 
