@@ -1,0 +1,5 @@
+src/server/bin/
+src/server/build/
+
+src/client/bin/
+src/client/build/
