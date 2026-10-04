@@ -30,6 +30,8 @@ private:
     void handle_request();
     void exchange_end();
 
+    std::array<uint8_t, 4> generateConv();
+
     udp::socket socket_;
     udp::endpoint remote_endpoint_;
     udp::endpoint first_endpoint_;
@@ -37,5 +39,6 @@ private:
     boost::asio::streambuf send_streambuf_;
     StunCallback stunCallback_;
     std::set<udp::endpoint> remote_ends_;
+    std::set<udp::endpoint> active_ends_;
     bool got_first;
 };

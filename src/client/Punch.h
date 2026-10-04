@@ -29,6 +29,11 @@ public:
         isConnected_ = true;
     }
 
+    void setNotConnection()
+    {
+        isConnected_ = false;
+    }
+
     void startReceive(udp::socket& socket);
     void startPunching(udp::socket& socket);
     void sendPacket(udp::socket& socket, const std::string& msg);

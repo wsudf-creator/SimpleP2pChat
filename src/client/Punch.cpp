@@ -11,23 +11,22 @@ HolePunchClient::HolePunchClient(boost::asio::io_context& io_context, std::uint1
 
 
 void HolePunchClient::startPunching(udp::socket& socket)
-{
-    // if (!isConnected_)
-    
+{    
     // std::cout << "[UDP Punching]发送心跳包" << std::endl;
     sendPacket(socket, "PUNCH_HOLE");
     
     //每隔1秒发送一次心跳打洞包
     int duration;
-    if (isConnected_)
-    {
-        duration = 5;
-    }
-    else
-    {
-        duration = 1;
-    }
-    
+    duration = 1;
+    // if (isConnected_)
+    // {
+    //     duration = 5;
+    // }
+    // else
+    // {
+    //     duration = 1;
+    // }
+
     timer_.expires_after(std::chrono::seconds(duration));
     timer_.async_wait([this, &socket](boost::system::error_code ec){
         if (!ec)

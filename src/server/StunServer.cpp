@@ -1,5 +1,5 @@
 #include "StunServer.h"
-
+#include <random>
 using boost::asio::ip::udp;
 
 void StunServer::setStunCallback(const StunCallback& callback)
@@ -25,7 +25,7 @@ void StunServer::start_receive()
     socket_.async_receive_from(
         recv_streambuf_.prepare(1024), remote_endpoint_,
         [this](boost::system::error_code ec, std::size_t bytes_recvd) {
-            if (!ec && bytes_recvd >= 20) 
+            if (!ec) 
             {   
                 recv_streambuf_.commit(bytes_recvd);
 
@@ -34,24 +34,60 @@ void StunServer::start_receive()
                 is.read((char*)&type, 1); //消耗类型
                 // recv_streambuf_.consume(1);
 
-                handle_request();
-                if (!got_first)
+                if (type == STOP)
                 {
-                    first_endpoint_ = remote_endpoint_;
-                    got_first = true;
+                    active_ends_.erase(remote_endpoint_);
+                    remote_ends_.erase(remote_endpoint_);
+
+                    if (got_first && remote_endpoint_ == first_endpoint_) //first_endpoint_断连
+                    {
+                        got_first = false;
+                        first_endpoint_ = udp::endpoint();
+     
+                        if (active_ends_.size() > 0)
+                        {
+                            remote_ends_ = active_ends_;
+                            // send_streambuf_.consume(send_streambuf_.size());
+                            // std::ostream os(&send_streambuf_);
+                            // os.put(MESSAGE);
+                            
+                            // std::string msg("server endpoint closed the connection\n");
+                            // std::cout << "[StunServer]:" << msg << std::endl;
+                            // os.write(msg.c_str(), msg.size());
+
+                            // for (auto& end : active_ends_)
+                            // {
+                            //     socket_.async_send_to(send_streambuf_.data(), end, [](boost::system::error_code ec, std::size_t){
+                            //         if (ec)
+                            //         {
+                            //             std::cerr << ec.what() << std::endl;
+                            //         }
+                            //     });
+                            // }
+                        }
+                    }
                 }
-                else if(got_first && remote_endpoint_ != first_endpoint_)
+                else if (bytes_recvd >= 20)
                 {
-                    remote_ends_.insert(remote_endpoint_);
-                    if (remote_ends_.size() > 0)
-                        exchange_end();
-                }
-                else if (got_first && remote_endpoint_ == first_endpoint_)
-                {
-                    if (remote_ends_.size() > 0)
-                        exchange_end();
+                    handle_request();
+                    if (!got_first && remote_endpoint_ != first_endpoint_)
+                    {
+                        first_endpoint_ = remote_endpoint_;
+                        got_first = true;
+                        active_ends_.insert(remote_endpoint_);
+                        if (remote_ends_.size() > 0)
+                            exchange_end();
+                    }
+                    else if(got_first && remote_endpoint_ != first_endpoint_)
+                    {
+                        remote_ends_.insert(remote_endpoint_);
+                        active_ends_.insert(remote_endpoint_);
+                        if (remote_ends_.size() > 0)
+                            exchange_end();
+                    }
                 }
             }
+            
             start_receive();
         });
 }
@@ -97,9 +133,17 @@ void StunServer::handle_request()
 
 void StunServer::exchange_end()
 { 
+    std::shared_ptr<std::array<uint8_t, 4>> convPtr = std::make_shared<std::array<uint8_t, 4>>(generateConv());
+
     for (auto it = remote_ends_.begin(); it != remote_ends_.end();)
     {
         auto end = *it;
+        if (first_endpoint_ == end)
+        {
+            it = remote_ends_.erase(it);
+            continue;
+        }
+
         std::cout << "[交换IP:Port]:" << first_endpoint_.address().to_v4().to_string() << ":" << first_endpoint_.port() << "<->"
                   << end.address().to_v4().to_string() << ":" << end.port() << std::endl;
         send_streambuf_.consume(send_streambuf_.size());
@@ -110,6 +154,7 @@ void StunServer::exchange_end()
         fos.put(EXTERNAL_IP);
         write_be32(fos, ip);
         write_be16(fos, port);
+        fos.write(reinterpret_cast<const char*>(convPtr->data()), 4);
 
         socket_.async_send_to(
         send_streambuf_.data(), first_endpoint_,
@@ -129,6 +174,7 @@ void StunServer::exchange_end()
         oos.put(EXTERNAL_IP);
         write_be32(oos, ip);
         write_be16(oos, port);
+        oos.write(reinterpret_cast<const char*>(convPtr->data()), 4);
 
         socket_.async_send_to(
         send_streambuf_.data(), end,
@@ -145,3 +191,18 @@ void StunServer::exchange_end()
     }
 }
 
+std::array<uint8_t, 4> StunServer::generateConv()
+{
+    std::array<uint8_t, 4> conv;
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint16_t> dis(0, 255);
+
+    for (size_t i = 0; i < 4; ++i)
+    {
+        conv[i] = static_cast<uint8_t>(dis(gen));
+    }
+
+    return conv;
+}

@@ -1,10 +1,11 @@
 #include "StunClient.h"
 
-#include <iostream>
+
 #include <iomanip>
 #include <ostream>
 #include <random>
 #include <chrono>
+
 
 uint32_t getCurrentTimestampMs() 
 {
@@ -17,41 +18,53 @@ uint32_t getCurrentTimestampMs()
 }
 
 StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, const std::string& remoteIp, uint16_t remotePort)
-    : socket_(io_context, udp::endpoint(udp::v4(), localPort)),
+    : ioctxPtr_(&io_context), 
+      socket_(io_context, udp::endpoint(udp::v4(), localPort)),
+      signals_(io_context),
       serverEndpoint_(boost::asio::ip::make_address(remoteIp), remotePort),
       timer_(io_context),
       isResolved_(false),
-      holePunchClient_(io_context, localPort),
-      udpChat_(&socket_)
+      holePunchClient_(io_context, localPort)
 {
+    running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
     std::cout << "[Stun服务端]目标IP: " << remoteIp << ":" << remotePort << std::endl;
 
-    conv_ = udpChat_.conv();
-    kcp_ = udpChat_.kcp();
+    kcp_ = nullptr;
+    currentChat_.store(std::make_shared<UdpChat>(&socket_));
+
+    signals_.add(SIGINT);
+    signals_.add(SIGTERM);
 
     startSend();
     startReceive();
     startKcpTimer();
+    startWaitingSignals();
 }
 
 StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, udp::endpoint& serverEndpoint)
-    : socket_(io_context, udp::endpoint(udp::v4(), localPort)),
+    : ioctxPtr_(&io_context), 
+      socket_(io_context, udp::endpoint(udp::v4(), localPort)),
+      signals_(io_context),
       serverEndpoint_(serverEndpoint),
       timer_(io_context),
       isResolved_(false),
-      holePunchClient_(io_context, localPort),
-      udpChat_(&socket_)
+      holePunchClient_(io_context, localPort)
 {
+    running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
     std::cout << "[Stun服务端]准备访问: " << serverEndpoint_.address().to_string() << std::endl;
     
-    conv_ = udpChat_.conv();
-    kcp_ = udpChat_.kcp();
+    kcp_ = nullptr;
+    currentChat_.store(std::make_shared<UdpChat>(&socket_));
+
+    signals_.add(SIGINT);
+    signals_.add(SIGTERM);
 
     startSend();
     startReceive();
     startKcpTimer();
+    startWaitingSignals();
 }
 
 void StunClient::startSend()
@@ -116,11 +129,12 @@ void StunClient::startReceive()
             if (!holePunchClient_.isConnected())
             {
                 holePunchClient_.setConnection();
-                std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n";
-
+                std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
                 holePunchClient_.sendPacket(socket_, "P2P_ACK");
             }
-            udpChat_.setTargetEndpoint(senderEndpoint_);
+            
+            // udpChat_.setTargetEndpoint(senderEndpoint_);
+            currentChat_.load()->setTargetEndpoint(senderEndpoint_);
         }
         else if (!ec && type == MESSAGE)
         {
@@ -135,11 +149,12 @@ void StunClient::startReceive()
             if (kcpRet< 0) 
             {
                 std::cerr << "[KCP Error] ikcp_input 解析失败，错误码: " << kcpRet << std::endl;
-            } 
+            }
             else 
             {
                 char message[4096];
                 int recvBytes = ikcp_recv(kcp_, message, sizeof(message));
+
                 if (recvBytes > 0)
                 {
                     std::string result(message, recvBytes);
@@ -151,6 +166,15 @@ void StunClient::startReceive()
             //                 std::istreambuf_iterator<char>());
             // std::cout << "\n[" << senderEndpoint_ << "]:" << msg << std::endl;
         }
+        else if (!ec && type == STOP)
+        {
+            std::cout << "[" << senderEndpoint_ << "]:" << "断开连接" << std::endl;
+            holePunchClient_.setNotConnection();
+            
+            auto newChat = std::make_shared<UdpChat>(&socket_);
+            currentChat_.store(newChat);
+            kcp_ = nullptr;
+        }
         else if (!ec)
         {
            std::cout << "Unknown action" << std::endl;
@@ -160,6 +184,35 @@ void StunClient::startReceive()
             std::cerr << "[接收失败]:" << ec.message() << std::endl;
         }
         startReceive();
+    });
+}
+
+void StunClient::startWaitingSignals()
+{
+    signals_.async_wait([this](const boost::system::error_code& ec, int signal){
+        if (!ec)
+        {
+            running_ = false;
+            std::cout << "[client]正在终止程序..." << std::endl;
+
+            sendStreambuf_.consume(sendStreambuf_.size());
+            std::ostream os(&sendStreambuf_);
+            os.put(STOP);
+
+            socket_.send_to(sendStreambuf_.data(), serverEndpoint_);
+
+            if (currentChat_.load()->peerEndpoint().size() > 0)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    socket_.send_to(sendStreambuf_.data(), currentChat_.load()->peerEndpoint());
+                }
+            }
+            
+
+            socket_.close();
+            ioctxPtr_->stop();
+        }
     });
 }
 
@@ -284,12 +337,18 @@ void StunClient::parseExternalIp()
 
     uint32_t externalIp32 = read_be32(is);
     uint16_t externalPort32 = read_be16(is);
+    uint32_t conv = read_be32(is);
 
     if (externalIp32 && externalPort32)
     {
         isResolved_ = true;
         boost::asio::ip::address_v4 externalIp(externalIp32);
         std::cout << "[穿透目标IP:Port]:" << externalIp.to_string() << ":" << std::dec << static_cast<int>(externalPort32) << std::endl;
+
+        currentChat_.load()->setConv(conv);
+        currentChat_.load()->createKcpConversation();
+        kcp_ = currentChat_.load()->kcp();
+        std::cout << "[kcp conv]:" << std::hex << conv << std::endl;
 
         //开始punch
         punching(externalIp32, externalPort32);
@@ -314,7 +373,10 @@ void StunClient::startKcpTimer()
         if (!ec) {
             // 获取当前毫秒级时间戳驱动 KCP 状态机
             IUINT32 current_ms = getCurrentTimestampMs();
-            ikcp_update(kcp_, current_ms);
+            if (kcp_)
+            {
+                ikcp_update(kcp_, current_ms);
+            }
 
             // 递归循环定时器
             startKcpTimer();

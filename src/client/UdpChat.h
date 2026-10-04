@@ -16,6 +16,7 @@ public:
     UdpChat() = default;
     UdpChat(udp::socket* socket);
     void send(const std::string& message);
+    void send(void* data, int size);
     void run();
 
     void setTargetEndpoint(udp::endpoint peer_endpoint)
@@ -40,8 +41,20 @@ public:
 
     ikcpcb* kcp() const
     {
+        if (!kcp_)
+        {
+            std::cerr << "[UdpChat]:Invalid kcp instance" << std::endl;
+            return nullptr;
+        }
         return kcp_;
     }
+
+    void setConv(IUINT32 conv)
+    {
+        conv_ = conv;
+    }
+
+    void createKcpConversation();
 
 
 private:    

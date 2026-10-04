@@ -25,12 +25,19 @@ int udpOutputCallback(const char* buf, int len, ikcpcb* kcp, void* user)
 UdpChat::UdpChat(udp::socket* socket)
 {
     socket_ = socket;
-    std::cout << "=== UDP 聊天已启动 ===" << std::endl;
-    std::cout << "请输入消息后按回车发送：\n" << std::endl;
+}
 
-    conv_ = 0x12345678;
+void UdpChat::createKcpConversation()
+{
+    if (!conv_)
+    {
+        std::cerr << "[UdpChat::createKcpConversation]:Invalid conv" << std::endl;
+    }
+
     kcp_ = ikcp_create(conv_, static_cast<void*>(this));
     kcp_->output = udpOutputCallback;
+    std::cout << "=== UDP 聊天已启动 ===" << std::endl;
+    std::cout << "请输入消息后按回车发送：\n" << std::endl;
 }
 
     // 发送消息到目标节点
@@ -52,18 +59,15 @@ void UdpChat::send(const std::string& message)
     });
 }
 
-void UdpChat::run()
+void UdpChat::send(void* data, int size)
 {
-    std::string input;
-    std::cout << "> " << std::flush;
-    while (std::getline(std::cin, input)) 
-    {
-        if (input == "/quit") 
+    boost::asio::post(socket_->get_executor(), [this, data, size](){
+        if (peer_endpoint_.size() == 0)
         {
-            // io_context.stop();
-            break;
+            std::cout << "[Invalid peer address]" << std::endl;
+            return ;
         }
-        send(input);
-        std::cout << "> " << std::flush;
-    }
+
+        ikcp_send(kcp_, (const char*)data, size);
+    });
 }

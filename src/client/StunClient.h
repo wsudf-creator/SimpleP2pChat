@@ -5,9 +5,9 @@
 
 #include "Punch.h"
 #include "UdpChat.h"
-
+#include <atomic>
 #include <array>
-
+#include <iostream>
 #include <boost/asio.hpp>
 
 using boost::asio::ip::udp;
@@ -22,8 +22,21 @@ public:
 
     void runUdpchat()
     {
-        udpChat_.run();
+        std::string input;
+        while (running_)
+        {
+            std::shared_ptr<UdpChat> chat = currentChat_.load();
+            if (chat)
+            {
+                std::getline(std::cin, input);
+                std::cout << "> " << std::flush;
+    
+                chat->send(input);
+                std::cout << "> " << std::flush;
+            }
+        }
     }
+
 
 private:
     void startReceive();
@@ -39,13 +52,18 @@ private:
 
     void startKcpTimer();
 
+    void startWaitingSignals();
+    
+    boost::asio::io_context* ioctxPtr_;
     udp::socket socket_;
+    boost::asio::signal_set signals_;
     udp::endpoint serverEndpoint_; //stun服务器
 
     boost::asio::steady_timer timer_;
     bool isResolved_;
     HolePunchClient holePunchClient_;
-    UdpChat udpChat_;
+    // UdpChat udpChat_;
+    
 
     udp::endpoint senderEndpoint_; //实际收到包的来源
     // std::array<char, 1024> recvBuffer_;
@@ -54,7 +72,10 @@ private:
 
     std::array<uint8_t, 12> currentTransId_;  
 
+    std::atomic<std::shared_ptr<UdpChat>> currentChat_;
+
     IUINT32 conv_;
     ikcpcb* kcp_;
    
+    bool running_;
 };

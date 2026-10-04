@@ -14,5 +14,6 @@ constexpr uint8_t STUN_REQUEST = 0xAF;
 constexpr uint8_t EXTERNAL_IP = 0xBF;
 constexpr uint8_t PUNCHING = 0xCF;
 constexpr uint8_t MESSAGE = 0xDF;
+constexpr uint8_t STOP = 0xEF;
 
 
