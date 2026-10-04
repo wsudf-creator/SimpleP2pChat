@@ -199,7 +199,10 @@ void StunClient::startWaitingSignals()
             std::ostream os(&sendStreambuf_);
             os.put(STOP);
 
-            socket_.send_to(sendStreambuf_.data(), serverEndpoint_);
+            for (int i = 0; i < 3; i++)
+            {
+                socket_.send_to(sendStreambuf_.data(), serverEndpoint_);
+            }
 
             if (currentChat_.load()->peerEndpoint().size() > 0)
             {

@@ -34,7 +34,7 @@ void StunServer::start_receive()
                 is.read((char*)&type, 1); //消耗类型
                 // recv_streambuf_.consume(1);
 
-                if (type == STOP)
+                if (type == STOP && active_ends_.find(remote_endpoint_) != active_ends_.end())
                 {
                     active_ends_.erase(remote_endpoint_);
                     remote_ends_.erase(remote_endpoint_);

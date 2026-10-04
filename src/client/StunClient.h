@@ -29,7 +29,7 @@ public:
             if (chat)
             {
                 std::getline(std::cin, input);
-                std::cout << "> " << std::flush;
+                std::cout << ">" << std::flush;
     
                 chat->send(input);
                 std::cout << "> " << std::flush;
