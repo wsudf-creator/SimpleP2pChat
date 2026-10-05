@@ -118,13 +118,10 @@ void StunClient::startReceive()
             {
                 holePunchClient_.setConnection();
                 std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
-                holePunchClient_.sendPacket(socket_, "P2P_ACK");
-                
+                // holePunchClient_.sendPacket(socket_, "P2P_ACK");
             }
     
-            currentChat_.load()->setTargetEndpoint(senderEndpoint_);
-            currentChat_.load()->startKcpTimer();
-            currentChat_.load()->startHeartbeatLoop(); 
+            // currentChat_.load()->setTargetEndpoint(senderEndpoint_);
         }
         else if (!ec && type == MESSAGE)
         {
@@ -151,10 +148,15 @@ void StunClient::startReceive()
                     {
                         std::string result(message + 1, recvBytes - 1);
                         std::cout << "\n[" << senderEndpoint_ << "]:" << result << std::endl;
+       
                     }
                     else if (message[0] == UdpChat::MessageType::Heartbeating)
                     {
-                        // std::cout << "[debug]:接收到心跳包" << std::endl;
+                        if (!holePunchClient_.isConnected())
+                        {
+                            holePunchClient_.setConnection();
+                            std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
+                        }
                     }
                 }
             }
@@ -361,7 +363,11 @@ void StunClient::parseExternalIp()
 
 void StunClient::punching(uint32_t ip, uint16_t port)
 {
-    holePunchClient_.setRemoteEndpoint(ip, port);
-    // holePunchClient_.startReceive();
-    holePunchClient_.startPunching(socket_);
+    // holePunchClient_.setRemoteEndpoint(ip, port);
+    // holePunchClient_.startPunching(socket_);
+    boost::asio::ip::address_v4 remoteIp(ip);
+    udp::endpoint target(boost::asio::ip::address(remoteIp), port);
+    currentChat_.load()->setTargetEndpoint(target);
+    currentChat_.load()->startKcpTimer();
+    currentChat_.load()->startHeartbeatLoop();
 }

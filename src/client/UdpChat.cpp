@@ -48,11 +48,11 @@ void UdpChat::createKcpConversation()
 void UdpChat::send(const std::string& message, MessageType type) 
 {
     boost::asio::post(socket_->get_executor(), [this, message, type](){
-        if (peer_endpoint_.size() == 0)
-        {
-            std::cout << "[Invalid peer address]" << std::endl;
-            return ;
-        }
+        // if (peer_endpoint_.size() == 0)
+        // {
+        //     std::cout << "[Invalid peer address]" << std::endl;
+        //     return ;
+        // }
 
         auto send_data = std::make_shared<std::string>();
         send_data->push_back(static_cast<char>(type)); // 插入自定义字节
@@ -66,11 +66,11 @@ void UdpChat::send(const std::string& message, MessageType type)
 void UdpChat::send(void* data, int size)
 {
     boost::asio::post(socket_->get_executor(), [this, data, size](){
-        if (peer_endpoint_.size() == 0)
-        {
-            std::cout << "[Invalid peer address]" << std::endl;
-            return ;
-        }
+        // if (peer_endpoint_.size() == 0)
+        // {
+        //     std::cout << "[Invalid peer address]" << std::endl;
+        //     return ;
+        // }
 
         ikcp_send(kcp_, (const char*)data, size);
     });
