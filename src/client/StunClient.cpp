@@ -7,16 +7,6 @@
 #include <chrono>
 
 
-uint32_t getCurrentTimestampMs() 
-{
-    auto now = std::chrono::steady_clock::now();
-    auto duration = now.time_since_epoch();
-    // 转换为毫秒并强转为 32 位无符号整数
-    return static_cast<uint32_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()
-    );
-}
-
 StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, const std::string& remoteIp, uint16_t remotePort)
     : ioctxPtr_(&io_context), 
       socket_(io_context, udp::endpoint(udp::v4(), localPort)),
@@ -31,14 +21,13 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
     std::cout << "[Stun服务端]目标IP: " << remoteIp << ":" << remotePort << std::endl;
 
     kcp_ = nullptr;
-    currentChat_.store(std::make_shared<UdpChat>(&socket_));
+    currentChat_.store(std::make_shared<UdpChat>(ioctxPtr_, &socket_));
 
     signals_.add(SIGINT);
     signals_.add(SIGTERM);
 
     startSend();
     startReceive();
-    startKcpTimer();
     startWaitingSignals();
 }
 
@@ -56,14 +45,13 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
     std::cout << "[Stun服务端]准备访问: " << serverEndpoint_.address().to_string() << std::endl;
     
     kcp_ = nullptr;
-    currentChat_.store(std::make_shared<UdpChat>(&socket_));
+    currentChat_.store(std::make_shared<UdpChat>(ioctxPtr_, &socket_));
 
     signals_.add(SIGINT);
     signals_.add(SIGTERM);
 
     startSend();
     startReceive();
-    startKcpTimer();
     startWaitingSignals();
 }
 
@@ -131,10 +119,12 @@ void StunClient::startReceive()
                 holePunchClient_.setConnection();
                 std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
                 holePunchClient_.sendPacket(socket_, "P2P_ACK");
+                
             }
-            
-            // udpChat_.setTargetEndpoint(senderEndpoint_);
+    
             currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+            currentChat_.load()->startKcpTimer();
+            currentChat_.load()->startHeartbeatLoop(); 
         }
         else if (!ec && type == MESSAGE)
         {
@@ -157,8 +147,15 @@ void StunClient::startReceive()
 
                 if (recvBytes > 0)
                 {
-                    std::string result(message, recvBytes);
-                    std::cout << "\n[" << senderEndpoint_ << "]:" << result << std::endl;
+                    if (message[0] == UdpChat::MessageType::Messagiing)
+                    {
+                        std::string result(message + 1, recvBytes - 1);
+                        std::cout << "\n[" << senderEndpoint_ << "]:" << result << std::endl;
+                    }
+                    else if (message[0] == UdpChat::MessageType::Heartbeating)
+                    {
+                        // std::cout << "[debug]:接收到心跳包" << std::endl;
+                    }
                 }
             }
 
@@ -171,7 +168,7 @@ void StunClient::startReceive()
             std::cout << "[" << senderEndpoint_ << "]:" << "断开连接" << std::endl;
             holePunchClient_.setNotConnection();
             
-            auto newChat = std::make_shared<UdpChat>(&socket_);
+            auto newChat = std::make_shared<UdpChat>(ioctxPtr_, &socket_);
             currentChat_.store(newChat);
             kcp_ = nullptr;
         }
@@ -204,7 +201,7 @@ void StunClient::startWaitingSignals()
                 socket_.send_to(sendStreambuf_.data(), serverEndpoint_);
             }
 
-            if (currentChat_.load()->peerEndpoint().size() > 0)
+            if (holePunchClient_.isConnected())
             {
                 for (int i = 0; i < 3; i++)
                 {
@@ -367,22 +364,4 @@ void StunClient::punching(uint32_t ip, uint16_t port)
     holePunchClient_.setRemoteEndpoint(ip, port);
     // holePunchClient_.startReceive();
     holePunchClient_.startPunching(socket_);
-}
-
-void StunClient::startKcpTimer()
-{
-    timer_.expires_after(std::chrono::milliseconds(10));
-    timer_.async_wait([this](boost::system::error_code ec) {
-        if (!ec) {
-            // 获取当前毫秒级时间戳驱动 KCP 状态机
-            IUINT32 current_ms = getCurrentTimestampMs();
-            if (kcp_)
-            {
-                ikcp_update(kcp_, current_ms);
-            }
-
-            // 递归循环定时器
-            startKcpTimer();
-        }
-    });
 }

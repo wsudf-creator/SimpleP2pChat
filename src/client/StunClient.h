@@ -31,7 +31,7 @@ public:
                 std::getline(std::cin, input);
                 std::cout << ">" << std::flush;
     
-                chat->send(input);
+                chat->send(input, UdpChat::MessageType::Messagiing);
                 std::cout << "> " << std::flush;
             }
         }
@@ -46,14 +46,12 @@ private:
     void parseResponse();
 
     std::array<uint8_t, 12> generateTransactionId();
-    void sendWithRetry(int retryCount);
 
     void punching(uint32_t ip, uint16_t port);
 
-    void startKcpTimer();
-
     void startWaitingSignals();
     
+private:
     boost::asio::io_context* ioctxPtr_;
     udp::socket socket_;
     boost::asio::signal_set signals_;
