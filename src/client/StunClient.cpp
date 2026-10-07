@@ -6,6 +6,23 @@
 #include <random>
 #include <chrono>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <winsock2.h>
+#include <mswsock.h>
+
+void disableUdpConnReset(boost::asio::ip::udp::socket& socket) 
+{
+    BOOL bNewBehavior = FALSE;
+    DWORD dwBytesReturned = 0;
+    // 禁用 WSAECONNRESET (10054) 和 WSAECONNREFUSED (10061) 的响应
+    ::WSAIoctl(socket.native_handle(), SIO_UDP_CONNRESET,
+               &bNewBehavior, sizeof(bNewBehavior),
+               NULL, 0, &dwBytesReturned, NULL, NULL);
+}
+
+#endif
+
 
 StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, const std::string& remoteIp, uint16_t remotePort)
     : ioctxPtr_(&io_context), 
@@ -16,6 +33,10 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
       isResolved_(false),
       holePunchClient_(io_context, localPort)
 {
+#ifdef _WIN32
+    disableUdpConnReset(socket_);
+#endif
+
     running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
     std::cout << "[Stun服务端]目标IP: " << remoteIp << ":" << remotePort << std::endl;
@@ -40,6 +61,10 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
       isResolved_(false),
       holePunchClient_(io_context, localPort)
 {
+
+#ifdef _WIN32
+    disableUdpConnReset(socket_);
+#endif
     running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
     std::cout << "[Stun服务端]准备访问: " << serverEndpoint_.address().to_string() << std::endl;

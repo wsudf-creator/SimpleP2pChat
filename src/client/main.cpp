@@ -4,12 +4,11 @@
 #include <windows.h>
 #endif
 
-
 int main(int argc, char* argv[])
 {
     #ifdef _WIN32
-    SetConsoleOutputCP(CP_UTF8);   // 控制台输出用 UTF-8
-    SetConsoleCP(CP_UTF8);         // 控制台输入用 UTF-8
+    SetConsoleOutputCP(65001);
+    SetConsoleCP(65001);
     #endif
 
     boost::asio::io_context io_context;
