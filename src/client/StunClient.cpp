@@ -150,6 +150,12 @@ void StunClient::startReceive()
         }
         else if (!ec && type == MESSAGE)
         {
+            if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
+            {
+                std::cout << "[debug]:对端endpoint发生变更" << std::endl;
+                currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+            }
+
             std::istream is(&recvStreambuf_);
 
             std::vector<char> rawData(
@@ -169,12 +175,6 @@ void StunClient::startReceive()
 
                 if (recvBytes > 0)
                 {   
-                    if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
-                    {
-                        std::cout << "[debug]:对端endpoint发生变更" << std::endl;
-                        currentChat_.load()->setTargetEndpoint(senderEndpoint_);
-                    }
-
                     if (message[0] == UdpChat::MessageType::Messagiing)
                     {
                         std::string result(message + 1, recvBytes - 1);
@@ -192,10 +192,6 @@ void StunClient::startReceive()
                     }
                 }
             }
-
-            // std::string msg((std::istreambuf_iterator<char>(is)), 
-            //                 std::istreambuf_iterator<char>());
-            // std::cout << "\n[" << senderEndpoint_ << "]:" << msg << std::endl;
         }
         else if (!ec && type == STOP)
         {
