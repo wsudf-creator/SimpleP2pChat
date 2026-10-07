@@ -168,7 +168,13 @@ void StunClient::startReceive()
                 int recvBytes = ikcp_recv(kcp_, message, sizeof(message));
 
                 if (recvBytes > 0)
-                {
+                {   
+                    if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
+                    {
+                        std::cout << "[debug]:对端endpoint发生变更" << std::endl;
+                        currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+                    }
+
                     if (message[0] == UdpChat::MessageType::Messagiing)
                     {
                         std::string result(message + 1, recvBytes - 1);
