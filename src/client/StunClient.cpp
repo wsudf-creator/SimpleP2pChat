@@ -34,7 +34,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
       holePunchClient_(io_context, localPort)
 {
 #ifdef _WIN32
-    disableUdpConnReset(socket_);
+    // disableUdpConnReset(socket_);
 #endif
 
     running_ = true;
@@ -63,7 +63,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
 {
 
 #ifdef _WIN32
-    disableUdpConnReset(socket_);
+    // disableUdpConnReset(socket_);
 #endif
     running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
@@ -188,6 +188,7 @@ void StunClient::startReceive()
                             holePunchClient_.setConnection();
                             std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
                         }
+                        std::cout << "[debug]:heartbeating from:" << senderEndpoint_ << std::endl;
                     }
                 }
             }
@@ -212,6 +213,7 @@ void StunClient::startReceive()
         else
         {
             std::cerr << "[startReceive:接收失败]:" << ec.what() << std::endl;
+            std::cerr << ec.message() << std::endl;
         }
         startReceive();
     });
