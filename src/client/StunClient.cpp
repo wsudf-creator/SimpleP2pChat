@@ -208,10 +208,25 @@ void StunClient::startReceive()
         }
         else
         {
-            std::cerr << "[startReceive:接收失败]:" << ec.what() << std::endl;
-            std::cerr << "[message]:" << ec.message() << std::endl;
-            std::cerr << "[value]:" << ec.value() << std::endl;
-            std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
+            if (ec.value() == 10061)
+            {
+                std::cerr << "[error]: 10061" << std::endl;
+                std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
+                
+                if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
+                {
+                    std::cout << "[debug]:对端endpoint发生变更" << std::endl;
+                    currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+                }
+            }
+            else
+            {
+                std::cerr << "[startReceive:接收失败]:" << ec.what() << std::endl;
+                std::cerr << "[message]:" << ec.message() << std::endl;
+                std::cerr << "[value]:" << ec.value() << std::endl;
+                std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
+                return ;
+            }
         }
         startReceive();
     });
