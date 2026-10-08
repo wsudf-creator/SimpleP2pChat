@@ -150,7 +150,7 @@ void StunClient::startReceive()
             {
                 holePunchClient_.setConnection();
                 std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
-                // holePunchClient_.sendPacket(socket_, "P2P_ACK");
+                socket_.connect(senderEndpoint_);
             }
     
         }
