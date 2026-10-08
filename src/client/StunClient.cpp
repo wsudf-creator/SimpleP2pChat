@@ -133,22 +133,22 @@ void StunClient::startReceive()
         {
             parseExternalIp(); //得到对方的公网ip并启动udp打洞
         }
-        else if (!ec && type == PUNCHING)
-        {
-            std::istream is(&recvStreambuf_);
-            std::string msg((std::istreambuf_iterator<char>(is)), 
-                            std::istreambuf_iterator<char>());
-            // std::cout << "\n[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
-            if (!holePunchClient_.isConnected())
-            {
-                holePunchClient_.setConnection();
-                std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
-                // holePunchClient_.sendPacket(socket_, "P2P_ACK");
-            }
+        // else if (!ec && type == PUNCHING)
+        // {
+        //     std::istream is(&recvStreambuf_);
+        //     std::string msg((std::istreambuf_iterator<char>(is)), 
+        //                     std::istreambuf_iterator<char>());
+        //     // std::cout << "\n[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
+        //     if (!holePunchClient_.isConnected())
+        //     {
+        //         holePunchClient_.setConnection();
+        //         std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
+        //         // holePunchClient_.sendPacket(socket_, "P2P_ACK");
+        //     }
     
-            // currentChat_.load()->setTargetEndpoint(senderEndpoint_);
-        }
-        else if (!ec && type == MESSAGE)
+        //     // currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+        // }
+        else if (!ec && type == MESSAGE)  //kcp数据
         {
             if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
             {
@@ -209,7 +209,9 @@ void StunClient::startReceive()
         else
         {
             std::cerr << "[startReceive:接收失败]:" << ec.what() << std::endl;
-            std::cerr << ec.message() << std::endl;
+            std::cerr << "[message]:" << ec.message() << std::endl;
+            std::cerr << "[value]:" << ec.value() << std::endl;
+            std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
         }
         startReceive();
     });
@@ -362,7 +364,7 @@ std::array<uint8_t, 12> StunClient::generateTransactionId()
     return transId;
 }
 
-void StunClient::parseExternalIp()
+void StunClient::parseExternalIp() //收到对方的endpoint
 {
     std::istream is(&recvStreambuf_);
 
