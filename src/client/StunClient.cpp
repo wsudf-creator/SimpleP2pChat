@@ -34,7 +34,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
       holePunchClient_(io_context, localPort)
 {
 #ifdef _WIN32
-    // disableUdpConnReset(socket_);
+    disableUdpConnReset(socket_);
 #endif
 
     running_ = true;
@@ -63,7 +63,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
 {
 
 #ifdef _WIN32
-    // disableUdpConnReset(socket_);
+    disableUdpConnReset(socket_);
 #endif
     running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
@@ -212,7 +212,7 @@ void StunClient::startReceive()
             {
                 std::cerr << "[error]: 10061" << std::endl;
                 std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
-                
+
                 if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
                 {
                     std::cout << "[debug]:对端endpoint发生变更" << std::endl;
