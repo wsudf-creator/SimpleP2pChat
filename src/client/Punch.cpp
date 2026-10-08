@@ -1,4 +1,5 @@
 #include "Punch.h"
+#include <random>
 
 HolePunchClient::HolePunchClient(boost::asio::io_context& io_context, std::uint16_t local_port)
     : timer_(io_context), 
@@ -14,16 +15,19 @@ void HolePunchClient::startPunching(udp::socket& socket)
 {    
     sendPacket(socket, "PUNCH_HOLE");
     
-    //每隔1秒发送一次心跳打洞包
-    int duration;
-    duration = 1;
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dist(3000, 5000);
 
-    timer_.expires_after(std::chrono::seconds(duration));
+    int duration_ms = dist(gen);
+
+    timer_.expires_after(std::chrono::milliseconds(duration_ms));
     timer_.async_wait([this, &socket](boost::system::error_code ec){
-        if (!ec)
+        if (ec == boost::asio::error::operation_aborted)
         {
-            startPunching(socket);
+            return ;
         }
+        startPunching(socket);
     });
 }
 
