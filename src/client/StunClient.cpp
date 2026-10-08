@@ -34,7 +34,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
       holePunchClient_(io_context, localPort)
 {
 #ifdef _WIN32
-    // disableUdpConnReset(socket_);
+    disableUdpConnReset(socket_);
 #endif
 
     running_ = true;
@@ -63,7 +63,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
 {
 
 #ifdef _WIN32
-    // disableUdpConnReset(socket_);
+    disableUdpConnReset(socket_);
 #endif
     running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
@@ -145,7 +145,7 @@ void StunClient::startReceive()
             std::istream is(&recvStreambuf_);
             std::string msg((std::istreambuf_iterator<char>(is)), 
                             std::istreambuf_iterator<char>());
-            std::cout << "\n[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
+            std::cout << "[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
             if (!holePunchClient_.isConnected())
             {
                 holePunchClient_.setConnection();
@@ -219,12 +219,14 @@ void StunClient::startReceive()
             {
                 std::cerr << "[error]: 10061" << std::endl;
                 std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
+                std::cerr << "[socket status]:" << socket_.is_open() << std::endl;
 
-                // if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
-                // {
-                //     std::cout << "[debug]:对端endpoint发生变更" << std::endl;
-                //     currentChat_.load()->setTargetEndpoint(senderEndpoint_);
-                // }
+                if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
+                {
+                    std::cout << "[debug]:对端endpoint发生变更" << std::endl;
+                    holePunchClient_.setRemoteEndpoint(senderEndpoint_.address().to_v4().to_uint(), senderEndpoint_.port());
+                    currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+                }
             }
             else
             {
@@ -232,7 +234,6 @@ void StunClient::startReceive()
                 std::cerr << "[message]:" << ec.message() << std::endl;
                 std::cerr << "[value]:" << ec.value() << std::endl;
                 std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
-                return ;
             }
         }
         startReceive();
@@ -244,7 +245,6 @@ void StunClient::startWaitingSignals()
     signals_.async_wait([this](const boost::system::error_code& ec, int signal){
         if (!ec)
         {
-            running_ = false;
             std::cout << "[client]正在终止程序..." << std::endl;
 
             sendStreambuf_.consume(sendStreambuf_.size());
@@ -264,7 +264,7 @@ void StunClient::startWaitingSignals()
                 }
             }
             
-
+            running_ = false;
             socket_.close();
             ioctxPtr_->stop();
         }
