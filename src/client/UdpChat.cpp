@@ -92,19 +92,16 @@ void UdpChat::startKcpTimer()
 {
     kcp_timer_.expires_after(std::chrono::milliseconds(10));
     kcp_timer_.async_wait([this](boost::system::error_code ec) {
-        if (ec)
+        if (!ec && kcp_)
         {
-            std::cerr << "[UdpChat::startKcpTimer]:" << ec.what() << std::endl;
-        } 
-        
-        // 获取当前毫秒级时间戳驱动 KCP 状态机
-        IUINT32 current_ms = getCurrentTimestampMs();
+            // 获取当前毫秒级时间戳驱动 KCP 状态机
+            IUINT32 current_ms = getCurrentTimestampMs();
 
-        ikcp_update(kcp_, current_ms);
+            ikcp_update(kcp_, current_ms);
 
-        // 递归循环定时器
-        startKcpTimer();
-        
+            // 递归循环定时器
+            startKcpTimer();
+        }       
     });
 }
 

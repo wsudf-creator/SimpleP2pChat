@@ -145,12 +145,12 @@ void StunClient::startReceive()
             std::istream is(&recvStreambuf_);
             std::string msg((std::istreambuf_iterator<char>(is)), 
                             std::istreambuf_iterator<char>());
-            std::cout << "[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
+            // std::cout << "[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
             if (!holePunchClient_.isConnected())
             {
                 holePunchClient_.setConnection();
                 std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
-                socket_.connect(senderEndpoint_);
+                // socket_.connect(senderEndpoint_);
             }
     
         }
@@ -188,15 +188,6 @@ void StunClient::startReceive()
                         std::cout << "\n[" << senderEndpoint_ << "]:" << result << std::endl;
        
                     }
-                    else if (message[0] == UdpChat::MessageType::Heartbeating)
-                    {
-                        if (!holePunchClient_.isConnected())
-                        {
-                            holePunchClient_.setConnection();
-                            std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
-                        }
-                        std::cout << "[debug]:heartbeating from:" << senderEndpoint_ << std::endl;
-                    }
                 }
             }
         }
@@ -215,26 +206,9 @@ void StunClient::startReceive()
         }
         else
         {
-            if (ec.value() == 10061)
-            {
-                std::cerr << "[error]: 10061" << std::endl;
-                std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
-                std::cerr << "[socket status]:" << socket_.is_open() << std::endl;
-
-                if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
-                {
-                    std::cout << "[debug]:对端endpoint发生变更" << std::endl;
-                    holePunchClient_.setRemoteEndpoint(senderEndpoint_.address().to_v4().to_uint(), senderEndpoint_.port());
-                    currentChat_.load()->setTargetEndpoint(senderEndpoint_);
-                }
-            }
-            else
-            {
-                std::cerr << "[startReceive:接收失败]:" << ec.what() << std::endl;
-                std::cerr << "[message]:" << ec.message() << std::endl;
-                std::cerr << "[value]:" << ec.value() << std::endl;
-                std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
-            }
+            std::cerr << "[startReceive:接收失败]:" << ec.what() << std::endl;
+            std::cerr << "[senderIP:Port]:" << senderEndpoint_.address().to_string() 
+                                             << std::dec << senderEndpoint_.port() << std::endl;
         }
         startReceive();
     });
@@ -245,6 +219,7 @@ void StunClient::startWaitingSignals()
     signals_.async_wait([this](const boost::system::error_code& ec, int signal){
         if (!ec)
         {
+            running_.store(false);
             std::cout << "[client]正在终止程序..." << std::endl;
 
             sendStreambuf_.consume(sendStreambuf_.size());
@@ -264,9 +239,9 @@ void StunClient::startWaitingSignals()
                 }
             }
             
-            running_ = false;
+            
             socket_.close();
-            ioctxPtr_->stop();
+            // ioctxPtr_->stop();
         }
     });
 }
@@ -402,8 +377,15 @@ void StunClient::parseExternalIp() //收到对方的endpoint
 
         currentChat_.load()->setConv(conv);
         currentChat_.load()->createKcpConversation();
+        
+
+        udp::endpoint target(boost::asio::ip::address(externalIp), externalPort32);
+
         kcp_ = currentChat_.load()->kcp();
         std::cout << "[kcp conv]:" << std::hex << conv << std::endl;
+
+        currentChat_.load()->setTargetEndpoint(target);
+        currentChat_.load()->startKcpTimer();
 
         //开始punch
         punching(externalIp32, externalPort32);
@@ -418,9 +400,5 @@ void StunClient::punching(uint32_t ip, uint16_t port)
 {
     holePunchClient_.setRemoteEndpoint(ip, port);
     holePunchClient_.startPunching(socket_);
-    boost::asio::ip::address_v4 remoteIp(ip);
-    udp::endpoint target(boost::asio::ip::address(remoteIp), port);
-    currentChat_.load()->setTargetEndpoint(target);
-    currentChat_.load()->startKcpTimer();
     // currentChat_.load()->startHeartbeatLoop();
 }

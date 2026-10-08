@@ -47,23 +47,6 @@ void StunServer::start_receive()
                         if (active_ends_.size() > 0)
                         {
                             remote_ends_ = active_ends_;
-                            // send_streambuf_.consume(send_streambuf_.size());
-                            // std::ostream os(&send_streambuf_);
-                            // os.put(MESSAGE);
-                            
-                            // std::string msg("server endpoint closed the connection\n");
-                            // std::cout << "[StunServer]:" << msg << std::endl;
-                            // os.write(msg.c_str(), msg.size());
-
-                            // for (auto& end : active_ends_)
-                            // {
-                            //     socket_.async_send_to(send_streambuf_.data(), end, [](boost::system::error_code ec, std::size_t){
-                            //         if (ec)
-                            //         {
-                            //             std::cerr << ec.what() << std::endl;
-                            //         }
-                            //     });
-                            // }
                         }
                     }
                 }
