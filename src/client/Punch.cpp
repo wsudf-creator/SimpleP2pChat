@@ -25,6 +25,7 @@ void HolePunchClient::startPunching(udp::socket& socket)
     timer_.async_wait([this, &socket](boost::system::error_code ec){
         if (ec == boost::asio::error::operation_aborted)
         {
+            std::cerr << "[operation_aborted]" << std::endl;
             return ;
         }
         startPunching(socket);
@@ -38,10 +39,13 @@ void HolePunchClient::sendPacket(udp::socket& socket, const std::string& msg)
     os.put(0xcf); //PUNCHING
     os.write(msg.c_str(), msg.size());
 
-    socket.async_send_to(buf.data(), remoteEndpoint_, [](boost::system::error_code ec, std::size_t){
-        if (ec)
-        {
-            std::cerr << "[发送失败]: " << ec.message() << std::endl;
-        }
+#ifdef _WIN32
+    std::cout << "[SEND] Sending heartbeat to " << remoteEndpoint_ << " ... " << std::endl;
+#endif
+    
+    socket.async_send_to(buf.data(), remoteEndpoint_, [](boost::system::error_code ec, std::size_t bytes){
+#ifdef _WIN32  
+        std::cout << "[SEND CALLBACK] ec: " << ec.message() << ", bytes: " << bytes << std::endl;  
+#endif
     });
 }
