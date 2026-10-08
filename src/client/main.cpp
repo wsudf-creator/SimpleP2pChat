@@ -12,6 +12,8 @@ int main(int argc, char* argv[])
     #endif
 
     boost::asio::io_context io_context;
+    auto work_guard = boost::asio::make_work_guard(io_context);
+
     udp::resolver resolver(io_context);
 
     std::string ip;
@@ -26,14 +28,17 @@ int main(int argc, char* argv[])
         udp::endpoint targetEndpoint = *endpoints.begin();
         StunClient client(io_context, 0, targetEndpoint);
 
-        std::thread input_thread([&client](){
-            client.runUdpchat();
+        std::thread net_thread([&io_context](){
+            io_context.run();
         });
-        io_context.run();
+        client.runUdpchat();
+        
+        work_guard.reset();
+        io_context.stop();
 
-        if (input_thread.joinable()) 
+        if (net_thread.joinable()) 
         {
-            input_thread.join();
+            net_thread.join();
         }
     }
     else if (argc == 2) // port
@@ -42,14 +47,17 @@ int main(int argc, char* argv[])
         udp::endpoint targetEndpoint = *endpoints.begin();
         StunClient client(io_context, atoi(argv[1]), targetEndpoint);
 
-        std::thread input_thread([&client](){
-            client.runUdpchat();
+        std::thread net_thread([&io_context](){
+            io_context.run();
         });
-        io_context.run();
+        client.runUdpchat();
+        
+        work_guard.reset();
+        io_context.stop();
 
-        if (input_thread.joinable()) 
+        if (net_thread.joinable()) 
         {
-            input_thread.join();
+            net_thread.join();
         }
 
     }
