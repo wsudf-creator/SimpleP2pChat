@@ -34,7 +34,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
       holePunchClient_(io_context, localPort)
 {
 #ifdef _WIN32
-    disableUdpConnReset(socket_);
+    // disableUdpConnReset(socket_);
 #endif
 
     running_ = true;
@@ -63,7 +63,7 @@ StunClient::StunClient(boost::asio::io_context& io_context, uint16_t localPort, 
 {
 
 #ifdef _WIN32
-    disableUdpConnReset(socket_);
+    // disableUdpConnReset(socket_);
 #endif
     running_ = true;
     std::cout << "[Stun客户端]绑定至本地端口:" << localPort << std::endl;
@@ -133,26 +133,33 @@ void StunClient::startReceive()
         {
             parseExternalIp(); //得到对方的公网ip并启动udp打洞
         }
-        // else if (!ec && type == PUNCHING)
-        // {
-        //     std::istream is(&recvStreambuf_);
-        //     std::string msg((std::istreambuf_iterator<char>(is)), 
-        //                     std::istreambuf_iterator<char>());
-        //     // std::cout << "\n[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
-        //     if (!holePunchClient_.isConnected())
-        //     {
-        //         holePunchClient_.setConnection();
-        //         std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
-        //         // holePunchClient_.sendPacket(socket_, "P2P_ACK");
-        //     }
+        else if (!ec && type == PUNCHING)
+        {
+            if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
+            {
+                std::cout << "[debug]:对端endpoint发生变更" << std::endl;
+                holePunchClient_.setRemoteEndpoint(senderEndpoint_.address().to_v4().to_uint(), senderEndpoint_.port());
+                currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+            }
+
+            std::istream is(&recvStreambuf_);
+            std::string msg((std::istreambuf_iterator<char>(is)), 
+                            std::istreambuf_iterator<char>());
+            std::cout << "\n[收到punch数据] 来自 " << senderEndpoint_ << " -> 内容:" << msg << std::endl;
+            if (!holePunchClient_.isConnected())
+            {
+                holePunchClient_.setConnection();
+                std::cout << ">>> [成功] P2P 直连通道已打通 <<<\n"; 
+                // holePunchClient_.sendPacket(socket_, "P2P_ACK");
+            }
     
-        //     // currentChat_.load()->setTargetEndpoint(senderEndpoint_);
-        // }
+        }
         else if (!ec && type == MESSAGE)  //kcp数据
         {
             if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
             {
                 std::cout << "[debug]:对端endpoint发生变更" << std::endl;
+                holePunchClient_.setRemoteEndpoint(senderEndpoint_.address().to_v4().to_uint(), senderEndpoint_.port());
                 currentChat_.load()->setTargetEndpoint(senderEndpoint_);
             }
 
@@ -213,11 +220,11 @@ void StunClient::startReceive()
                 std::cerr << "[error]: 10061" << std::endl;
                 std::cerr << "[senderEndpoint]:" << senderEndpoint_ << std::endl;
 
-                if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
-                {
-                    std::cout << "[debug]:对端endpoint发生变更" << std::endl;
-                    currentChat_.load()->setTargetEndpoint(senderEndpoint_);
-                }
+                // if (currentChat_.load()->peerEndpoint() != senderEndpoint_)
+                // {
+                //     std::cout << "[debug]:对端endpoint发生变更" << std::endl;
+                //     currentChat_.load()->setTargetEndpoint(senderEndpoint_);
+                // }
             }
             else
             {
@@ -409,11 +416,11 @@ void StunClient::parseExternalIp() //收到对方的endpoint
 
 void StunClient::punching(uint32_t ip, uint16_t port)
 {
-    // holePunchClient_.setRemoteEndpoint(ip, port);
-    // holePunchClient_.startPunching(socket_);
+    holePunchClient_.setRemoteEndpoint(ip, port);
+    holePunchClient_.startPunching(socket_);
     boost::asio::ip::address_v4 remoteIp(ip);
     udp::endpoint target(boost::asio::ip::address(remoteIp), port);
     currentChat_.load()->setTargetEndpoint(target);
     currentChat_.load()->startKcpTimer();
-    currentChat_.load()->startHeartbeatLoop();
+    // currentChat_.load()->startHeartbeatLoop();
 }

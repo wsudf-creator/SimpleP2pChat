@@ -12,11 +12,6 @@ HolePunchClient::HolePunchClient(boost::asio::io_context& io_context, std::uint1
 
 void HolePunchClient::startPunching(udp::socket& socket)
 {    
-    // std::cout << "[UDP Punching]发送心跳包" << std::endl;
-    if (isConnected_)
-    {
-        return ;
-    }
     sendPacket(socket, "PUNCH_HOLE");
     
     //每隔1秒发送一次心跳打洞包
